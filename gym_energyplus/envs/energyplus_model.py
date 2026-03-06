@@ -146,6 +146,10 @@ class EnergyPlusModel(metaclass=ABCMeta):
             self.plot_episode(csv_file)
             plt.show()
 
+    def _clear_ax_lines(self, ax):
+        for line in list(ax.lines):
+            line.remove()
+
     # Show convergence
     def show_progress(self):
         self.monitor_file = self.log_dir + "/monitor.csv"
@@ -209,7 +213,7 @@ class EnergyPlusModel(metaclass=ABCMeta):
 
     def plot_progress(self):
         # Redraw all lines
-        self.axprogress.lines = []
+        self.axprogress.clear()
         self.axprogress.plot(self.reward, color='#1f77b4', label='Reward')
         #self.axprogress.plot(self.reward_mean, color='#ff7f0e', label='Reward (average)')
         self.axprogress.legend()
@@ -262,7 +266,7 @@ class EnergyPlusModel(metaclass=ABCMeta):
                 self.reward.append(float(rew) / l)
                 self.reward_mean.append(float(rew) / l)
 
-            episodes_root = self.log_dir + '/output/'
+            episodes_root = self.log_dir + '/output'
             self.episode_dirs = [
                 f"{episodes_root}/{ep}"
                 for ep in os.listdir(episodes_root)

@@ -383,7 +383,7 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
             # Plot zone and outdoor temperature
             ax = self.axepisode[idx]
             idx += 1
-            ax.lines = []
+            self._clear_ax_lines(ax)
             ax.plot(self.westzone_temp, 'C0', label='Westzone temperature')
             ax.plot(self.eastzone_temp, 'C1', label='Eastzone temperature')
             ax.plot(self.outdoor_temp, 'C2', label='Outdoor temperature')
@@ -397,7 +397,7 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
             # Plot return air and sestpoint temperature
             ax = self.axepisode[idx]
             idx += 1
-            ax.lines = []
+            self._clear_ax_lines(ax)
             if show_west:
                 ax.plot(self.westzone_return_air_temp, 'C0', label='WEST ZONE RETURN AIR NODE:System Node Temperature')
                 ax.plot(self.westzone_dec_outlet_setpoint_temp, 'C1', label='Westzone DEC outlet setpoint temperature')
@@ -414,7 +414,7 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
             # Plot return air and sestpoint temperature
             ax = self.axepisode[idx]
             idx += 1
-            ax.lines = []
+            self._clear_ax_lines(ax)
             ax.plot(self.df['WEST ZONE SUPPLY FAN:Fan Air Mass Flow Rate [kg/s](Hourly)'], 'C0', label='WEST ZONE Air Mass Flow Rate')
             ax.plot(self.df['EAST ZONE SUPPLY FAN:Fan Air Mass Flow Rate [kg/s](Hourly)'], 'C1', label='EAST ZONE Air Mass Flow Rate')
             ax.legend()
@@ -425,7 +425,7 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
             # Plot west zone, return air, mixed air, supply fan
             ax = self.axepisode[idx]
             idx += 1
-            ax.lines = []
+            self._clear_ax_lines(ax)
             if show_west:
                 ax.plot(self.westzone_return_air_temp, 'C0', label='WEST ZONE RETURN AIR NODE:System Node Temperature')
                 ax.plot(self.westzone_mixed_air_temp, 'C1', label='WEST ZONE MIXED AIR NODE:System Node Temperature')
@@ -446,7 +446,7 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
             # Plot west zone ccoil, air loop
             ax = self.axepisode[idx]
             idx += 1
-            ax.lines = []
+            self._clear_ax_lines(ax)
             if show_west:
                 ax.plot(self.westzone_iec_outlet_temp, 'C0', label='Westzone IEC outlet temperature')
                 ax.plot(self.westzone_ccoil_air_outlet_temp, 'C1', label='Westzone ccoil air outlet temperature')
@@ -467,7 +467,7 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
             # Plot calculated reward
             ax = self.axepisode[idx]
             idx += 1
-            ax.lines = []
+            self._clear_ax_lines(ax)
             ax.plot(self.rewards, 'C0', label='Reward')
             ax.plot(self.rewards_gaussian1, 'C1', label='Gaussian1')
             ax.plot(self.rewards_trapezoid1, 'C2', label='Trapezoid1')
@@ -483,7 +483,7 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
             # Plot PUE
             ax = self.axepisode[idx]
             idx += 1
-            ax.lines = []
+            self._clear_ax_lines(ax)
             ax.plot(self.pue, 'C0', label='PUE')
             ax.legend()
             ax.set_ylabel('PUE')
@@ -493,7 +493,7 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
             # Plot other electric power consumptions
             ax = self.axepisode[idx]
             idx += 1
-            ax.lines = []
+            self._clear_ax_lines(ax)
             #ax.plot(self.total_electric_demand_power, 'C0', label=f'Whole Building:Facility Total {self.facility_power_output_var_suffix}')
             #ax.plot(self.total_building_electric_demand_power, 'C1', label=f'Whole Building:Facility Total Building {self.facility_power_output_var_suffix}')
             #ax.plot(self.total_hvac_electric_demand_power, 'C2', label=f'Whole Building:Facility Total HVAC {self.facility_power_output_var_suffix}')
@@ -508,7 +508,7 @@ class EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan(EnergyPlusModel):
             # Plot power consumptions
             ax = self.axepisode[idx]
             idx += 1
-            ax.lines = []
+            self._clear_ax_lines(ax)
             ax.plot(self.total_electric_demand_power, 'C0', label=f'Whole Building:Facility Total {self.facility_power_output_var_suffix}')
             ax.plot(self.total_building_electric_demand_power, 'C1', label=f'Whole Building:Facility Total Building {self.facility_power_output_var_suffix}')
             ax.plot(self.total_hvac_electric_demand_power, 'C2', label=f'Whole Building:Facility Total HVAC {self.facility_power_output_var_suffix}')

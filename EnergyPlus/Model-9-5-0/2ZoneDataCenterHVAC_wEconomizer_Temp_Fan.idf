@@ -112,7 +112,7 @@
 ! Utility Tariffs:                None
 
   Version,9.5;
-
+! 时间步长，每小时4个步长
   Timestep,4;
 
   Building,
@@ -130,7 +130,7 @@
   SurfaceConvectionAlgorithm:Inside,TARP;
 
   SurfaceConvectionAlgorithm:Outside,DOE-2;
-
+! 模拟控制
   SimulationControl,
     Yes,                     !- Do Zone Sizing Calculation
     Yes,                     !- Do System Sizing Calculation
@@ -139,7 +139,7 @@
     Yes,                     !- Run Simulation for Weather File Run Periods
     No,                      !- Do HVAC Sizing Simulation for Sizing Periods
     1;                       !- Maximum Number of HVAC Sizing Simulation Passes
-
+! 运行周期
   RunPeriod,
     WholeYearDay,            !- Name
     1,                       !- Begin Month
@@ -223,7 +223,7 @@
     190.00;                  !- Elevation {m}
 
 ! CHICAGO_IL_USA Annual Heating 99% Design Conditions DB, MaxDB= -17.3°C
-
+! 设计日：作用是当启用Autosize时，EnergyPlus会根据设计日的计算结果，自动决定设备需要多大功率。
   SizingPeriod:DesignDay,
     CHICAGO_IL_USA Annual Heating 99% Design Conditions DB,  !- Name
     1,                       !- Month
@@ -897,27 +897,27 @@
   Branch,
     West Zone Air Loop Main Branch,  !- Name
     ,                        !- Pressure Drop Curve Name
-    AirLoopHVAC:OutdoorAirSystem,  !- Component 1 Object Type
+    AirLoopHVAC:OutdoorAirSystem,  !- Component 1 Object Type 新风系统
     West Zone OA System,     !- Component 1 Name
     West Zone Return Air Node,  !- Component 1 Inlet Node Name
     West Zone Mixed Air Node,!- Component 1 Outlet Node Name
-    Fan:VariableVolume,      !- Component 2 Object Type
+    Fan:VariableVolume,      !- Component 2 Object Type 变风量风机（将风推向房间的核心动力）
     West Zone Supply Fan,    !- Component 2 Name
     West Zone Mixed Air Node,!- Component 2 Inlet Node Name
     West Zone Supply Fan Outlet Node,  !- Component 2 Outlet Node Name
-    EvaporativeCooler:Direct:ResearchSpecial,  !- Component 3 Object Type
+    EvaporativeCooler:Direct:ResearchSpecial,  !- Component 3 Object Type 直接蒸发冷却-DEC
     West Data Center DEC,    !- Component 3 Name
     West Zone Supply Fan Outlet Node,  !- Component 3 Inlet Node Name
     West Zone DEC Outlet Node,  !- Component 3 Outlet Node Name
-    EvaporativeCooler:Indirect:ResearchSpecial,  !- Component 4 Object Type
+    EvaporativeCooler:Indirect:ResearchSpecial,  !- Component 4 Object Type 间接蒸发冷却-IEC
     West Data Center IEC,    !- Component 4 Name
     West Zone DEC Outlet Node,  !- Component 4 Inlet Node Name
     West Zone IEC Outlet Node,  !- Component 4 Outlet Node Name
-    CoilSystem:Cooling:DX,   !- Component 5 Object Type
+    CoilSystem:Cooling:DX,   !- Component 5 Object Type 直接膨胀式冷盘管-DX Coil
     West Zone DX Cooling Coil,  !- Component 5 Name
     West Zone IEC Outlet Node,  !- Component 5 Inlet Node Name
     West Zone CCoil Air Outlet Node,  !- Component 5 Outlet Node Name
-    Coil:Cooling:Water,      !- Component 6 Object Type
+    Coil:Cooling:Water,      !- Component 6 Object Type 冷冻水盘管
     West Zone CW Cooling Coil,  !- Component 6 Name
     West Zone CCoil Air Outlet Node,  !- Component 6 Inlet Node Name
     West Air Loop Outlet Node;  !- Component 6 Outlet Node Name
@@ -3527,16 +3527,16 @@
     Zone People Occupant Count,  !- Variable or Meter 2 Name
     SumOrAverageDuringHoursShown;  !- Aggregation Type for Variable or Meter 2
 
-  EnergyManagementSystem:Sensor,
+  EnergyManagementSystem:Sensor,  !- 定义传感器对象
     OutdoorTemp,             !- Name
-    Environment,             !- Output:Variable or Output:Meter Index Key Name
-    Site Outdoor Air Drybulb Temperature;  !- Output:Variable or Output:Meter Name
-
-  EnergyManagementSystem:ProgramCallingManager,
+    Environment,             !- Output:Variable or Output:Meter Index Key Name 数据属于谁，室外对象统一固定为Environment
+    Site Outdoor Air Drybulb Temperature;  !- Output:Variable or Output:Meter Name 具体哪个变量
+! 定义程序调用管理器
+  EnergyManagementSystem:ProgramCallingManager,  
     Initialize ExtCtrl-Based Setpoint Manager,  !- Name
-    EndOfZoneSizing,         !- EnergyPlus Model Calling Point
-    InitializeExtCtrlBasedSetpointManager;  !- Program Name 1
-
+    EndOfZoneSizing,         !- EnergyPlus Model Calling Point 这是一个比较早期的阶段，在此‘时机’调用
+    InitializeExtCtrlBasedSetpointManager;  !- Program Name 1 调用这个函数，在下方进行定义
+! 定义程序调用 第一次握手初始化
   EnergyManagementSystem:Program,
     InitializeExtCtrlBasedSetpointManager,  !- Name
     SET tmp_val1 = @ExtCtrlObs 0;  !- Program Line 1
@@ -3550,12 +3550,12 @@
     EastZoneTemp,            !- Name
     EAST ZONE,               !- Output:Variable or Output:Meter Index Key Name
     Zone Mean Air Temperature;  !- Output:Variable or Output:Meter Name
-
+! 定义EMS执行器，改写模拟中的风机运行状态
   EnergyManagementSystem:Actuator,
-    WestZoneSupplyFan_FanAirMassFlowRate,  !- Name
-    WEST ZONE SUPPLY FAN,    !- Actuated Component Unique Name
-    Fan,                     !- Actuated Component Type
-    Fan Air Mass Flow Rate;  !- Actuated Component Control Type
+    WestZoneSupplyFan_FanAirMassFlowRate,  !- Name 变量名，可以直接通过此变量名设定风量
+    WEST ZONE SUPPLY FAN,    !- Actuated Component Unique Name 物理组件名称
+    Fan,                     !- Actuated Component Type 组件类型关键字
+    Fan Air Mass Flow Rate;  !- Actuated Component Control Type 具体控制指标，可直接改变风机风量
 
   EnergyManagementSystem:Actuator,
     EastZoneSupplyFan_FanAirMassFlowRate,  !- Name
@@ -3565,12 +3565,12 @@
 
   EnergyManagementSystem:ProgramCallingManager,
     ExtCtrl-Based Setpoint Manager,  !- Name
-    AfterPredictorAfterHVACManagers,  !- EnergyPlus Model Calling Point
+    AfterPredictorAfterHVACManagers,  !- EnergyPlus Model Calling Point 执行时机，在计算好需要的冷量和系统默认控制指令后介入
     ExtCtrlBasedSetpointManager;  !- Program Name 1
 
   EnergyManagementSystem:Program,
     ExtCtrlBasedSetpointManager,  !- Name
-    IF WarmupFlag == 0.0,    !- Program Line 1
+    IF WarmupFlag == 0.0,    !- Program Line 1 确保只有在正式模拟阶段才去接管外部python发来的命令。
     SET tmp_val1 = @ExtCtrlAct 0 7,  !- Program Line 2
     SET WestZoneDECOutletNode_setpoint = @ExtCtrlAct 1,  !- <none>
     SET WestZoneIECOutletNode_setpoint = @ExtCtrlAct 1,  !- <none>
@@ -3595,7 +3595,7 @@
 
   EnergyManagementSystem:ProgramCallingManager,
     ExtCtrl-Based Observation Collector,  !- Name
-    EndOfZoneTimestepAfterZoneReporting,  !- EnergyPlus Model Calling Point
+    EndOfZoneTimestepAfterZoneReporting,  !- EnergyPlus Model Calling Point 在报告生成之后采集数据。
     ExtCtrlBasedObservationCollector;  !- Program Name 1
 
   EnergyManagementSystem:Program,

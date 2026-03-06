@@ -1,2 +1,5 @@
 __pycache__
 .idea/
+EnergyPlus-9.5.0/
+eplog/
+_tmp_*/
