@@ -14,6 +14,9 @@ import datetime
 from baselines import logger
 from baselines_energyplus.bench import Monitor
 import gym
+import gym_energyplus  # register EnergyPlus envs
+import numpy as np
+import re
 
 
 def make_energyplus_env(env_id, seed):
@@ -22,8 +25,123 @@ def make_energyplus_env(env_id, seed):
     """
     env = gym.make(env_id)
     env = Monitor(env, logger.get_dir())
+    env = EpisodeMetricsWrapper(env, logger.get_dir())
     env.seed(seed)
     return env
+
+
+class EpisodeMetricsWrapper(gym.Wrapper):
+    """
+    Log comfort/energy metrics to a CSV alongside monitor.csv.
+
+    Metrics are computed from the flattened 5-zone obs (20 dims):
+    [Tout, Tz, CoolRate, HeatRate] * 5
+    """
+
+    def __init__(self, env, log_dir):
+        super().__init__(env)
+        self.log_dir = log_dir
+        self.metrics_path = os.path.join(log_dir, "metrics.csv")
+        self._reset_counters()
+        self._episode_idx = -1
+        self._timestep_per_hour = self._parse_timestep_per_hour(os.getenv("ENERGYPLUS_MODEL", ""))
+        self._dt_hours = 1.0 / float(self._timestep_per_hour) if self._timestep_per_hour else 0.25
+
+        os.makedirs(log_dir, exist_ok=True)
+        self._metrics_f = open(self.metrics_path, "w")
+        header = [
+            "episode",
+            "length",
+            "comfort_zone1",
+            "comfort_zone2",
+            "comfort_zone3",
+            "comfort_zone4",
+            "comfort_zone5",
+            "comfort_mean",
+            "energy_zone1_kwh",
+            "energy_zone2_kwh",
+            "energy_zone3_kwh",
+            "energy_zone4_kwh",
+            "energy_zone5_kwh",
+            "energy_mean_kwh",
+        ]
+        self._metrics_f.write(",".join(header) + "\n")
+        self._metrics_f.flush()
+
+    def reset(self, **kwargs):
+        if self._episode_idx >= 0:
+            self._flush_episode()
+        self._episode_idx += 1
+        self._reset_counters()
+        return self.env.reset(**kwargs)
+
+    def step(self, action):
+        obs, rew, done, info = self.env.step(action)
+        self._accumulate(obs)
+        if done:
+            self._flush_episode()
+        return obs, rew, done, info
+
+    def close(self):
+        try:
+            if self._episode_idx >= 0:
+                self._flush_episode()
+        finally:
+            if hasattr(self, "_metrics_f") and self._metrics_f:
+                self._metrics_f.flush()
+                self._metrics_f.close()
+        return self.env.close()
+
+    # ----------------------------
+    # Internal
+    # ----------------------------
+    def _reset_counters(self):
+        self._steps = 0
+        self._comfort_hits = np.zeros(5, dtype=np.int64)
+        self._energy_kwh = np.zeros(5, dtype=np.float64)
+
+    def _accumulate(self, obs):
+        obs = np.asarray(obs, dtype=np.float32).reshape(-1)
+        if obs.size != 20:
+            # Not the 5-zone flattened obs; skip
+            return
+        self._steps += 1
+        for i in range(5):
+            base = i * 4
+            tz = obs[base + 1]
+            cool_rate = obs[base + 2]
+            heat_rate = obs[base + 3]
+            if 22.0 <= tz <= 25.0:
+                self._comfort_hits[i] += 1
+            power_w = max(0.0, cool_rate) + max(0.0, heat_rate)
+            self._energy_kwh[i] += power_w * self._dt_hours / 1000.0
+
+    def _flush_episode(self):
+        if self._steps == 0:
+            return
+        comfort = self._comfort_hits.astype(np.float64) / float(self._steps)
+        comfort_mean = float(np.mean(comfort))
+        energy_mean = float(np.mean(self._energy_kwh))
+        row = [
+            str(self._episode_idx),
+            str(self._steps),
+            *[f"{v:.6f}" for v in comfort],
+            f"{comfort_mean:.6f}",
+            *[f"{v:.6f}" for v in self._energy_kwh],
+            f"{energy_mean:.6f}",
+        ]
+        self._metrics_f.write(",".join(row) + "\n")
+        self._metrics_f.flush()
+
+    def _parse_timestep_per_hour(self, idf_path):
+        if not idf_path or not os.path.isfile(idf_path):
+            return 4
+        with open(idf_path, "r") as f:
+            txt = f.read()
+        m = re.search(r"\bTimestep\s*,\s*([0-9]+)\s*;", txt, re.IGNORECASE)
+        if not m:
+            return 4
+        return int(m.group(1))
 
 
 def train(env_id, num_timesteps, seed):

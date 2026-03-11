@@ -26,7 +26,7 @@ class EnergyPlusModel(metaclass=ABCMeta):
         self.setup_spaces()
         self.action = 0.5 * (self.action_space.low + self.action_space.high)
         self.action_prev = self.action
-        self.raw_state = None
+        self.raw_state = None # 从管道传回的原始数据
         self.verbose = verbose
         self.timestamp_csv = None
         self.sl_episode = None

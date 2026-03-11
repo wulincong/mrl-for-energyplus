@@ -411,8 +411,7 @@
   Construction,
     INT-WALL-1,              !- Name
     GP02,                    !- Outside Layer
-    AL21,                    !- Layer 2
-    GP02;                    !- Layer 3
+    GP02;                    !- Layer 2
 
   WindowMaterial:Gas,
     AIR 13MM,                !- Name
@@ -3880,6 +3879,8 @@
   Output:Variable,*,Zone Thermostat Cooling Setpoint Temperature,hourly;
 
   Output:Variable,*,Zone Thermostat Heating Setpoint Temperature,hourly;
+
+  Output:Variable,*,Surface Inside Face Conduction Heat Transfer Rate,timestep;
 
   Output:VariableDictionary,Regular;
 

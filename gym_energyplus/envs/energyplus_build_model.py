@@ -11,6 +11,8 @@ from gym_energyplus.envs.energyplus_model_2ZoneDataCenterHVAC_wEconomizer_Temp i
     EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp
 from gym_energyplus.envs.energyplus_model_2ZoneDataCenterHVAC_wEconomizer_Temp_Fan import \
     EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer_Temp_Fan
+from gym_energyplus.envs.energyplus_model_5ZoneAirCooled import \
+    EnergyPlusModel5ZoneAirCooled
 
 
 def build_ep_model(model_file, log_dir, verbose=False):
@@ -30,6 +32,12 @@ def build_ep_model(model_file, log_dir, verbose=False):
         )
     elif match('2ZoneDataCenterHVAC_wEconomizer.*', model_basename):
         model = EnergyPlusModel2ZoneDataCenterHVAC_wEconomizer(
+            model_file=model_file,
+            log_dir=log_dir,
+            verbose=verbose
+        )
+    elif match('5ZoneAirCooled.*', model_basename):
+        model = EnergyPlusModel5ZoneAirCooled(
             model_file=model_file,
             log_dir=log_dir,
             verbose=verbose

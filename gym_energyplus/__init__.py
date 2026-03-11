@@ -8,3 +8,13 @@ register(
     id='EnergyPlus-v0',
     entry_point='gym_energyplus.envs:EnergyPlusEnv',
 )
+
+register(
+    id='EnergyPlusMultiAgent-v0',
+    entry_point='gym_energyplus.envs:EnergyPlusMultiAgentEnv',
+)
+
+register(
+    id='EnergyPlusMA-Single-v0',
+    entry_point='gym_energyplus.envs:EnergyPlusMASingleEnv',
+)
