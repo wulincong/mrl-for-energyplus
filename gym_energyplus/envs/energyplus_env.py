@@ -72,7 +72,10 @@ class EnergyPlusEnv(Env):
 
     def __del__(self):
         # In case you forget to call env.stop()
-        self.stop_instance()
+        try:
+            self.stop_instance()
+        except Exception:
+            pass
         
     def reset(self):
         self.stop_instance()

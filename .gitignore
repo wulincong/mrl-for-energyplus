@@ -3,3 +3,5 @@ __pycache__
 EnergyPlus-9.5.0/
 eplog/
 _tmp_*/
+rl2/
+data/

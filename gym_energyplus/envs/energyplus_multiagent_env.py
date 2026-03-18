@@ -4,6 +4,9 @@
 
 from typing import Dict, Tuple
 
+import argparse
+import os
+
 import numpy as np
 from gym import Env, spaces
 
@@ -146,3 +149,101 @@ class EnergyPlusMultiAgentEnv(MultiAgentEnv):
             rew_dict[aid] = float(gauss + trap + power_pen + smooth)
 
         return rew_dict
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Print action/state examples for EnergyPlusMultiAgentEnv"
+    )
+    parser.add_argument(
+        "--energyplus",
+        default=os.environ.get("ENERGYPLUS", "/usr/local/energyplus-9.5.0"),
+    )
+    parser.add_argument(
+        "--model",
+        default="EnergyPlus/5Zone/5ZoneAirCooled.idf",
+    )
+    parser.add_argument(
+        "--weather",
+        default=(
+            "EnergyPlus/Model-9-5-0/WeatherData/"
+            "USA_CA_San.Francisco.Intl.AP.724940_TMY3.epw"
+        ),
+    )
+    parser.add_argument("--log_dir", default="eplog/ma-multi-demo")
+    parser.add_argument("--seed", type=int, default=1)
+    args = parser.parse_args()
+
+    energyplus_path = os.path.abspath(args.energyplus)
+    model_path = os.path.abspath(args.model)
+    weather_path = os.path.abspath(args.weather)
+    log_dir_path = os.path.abspath(args.log_dir)
+
+    env = EnergyPlusMultiAgentEnv(
+        energyplus_file=energyplus_path,
+        model_file=model_path,
+        weather_file=weather_path,
+        log_dir=log_dir_path,
+        seed=args.seed,
+        verbose=False,
+    )
+
+    try:
+        obs_dict = env.reset()
+        print("[example] observation_space(per-agent):", env.observation_space)
+        print("[example] action_space(per-agent):", env.action_space)
+        print("[example] agent_ids:", env.AGENT_IDS)
+
+        print("[example] reset obs sample:")
+        for aid in env.AGENT_IDS:
+            obs = np.asarray(obs_dict[aid])
+            print(f"  {aid}: shape={obs.shape}, obs={obs}")
+
+        action_dict = {aid: env.action_space.sample() for aid in env.AGENT_IDS}
+        print("[example] sampled action_dict:")
+        for aid in env.AGENT_IDS:
+            action = np.asarray(action_dict[aid])
+            print(f"  {aid}: shape={action.shape}, action={action}")
+
+        next_obs_dict, rew_dict, done_dict, info_dict = env.step(action_dict)
+        print("[example] step next_obs sample:")
+        for aid in env.AGENT_IDS:
+            next_obs = np.asarray(next_obs_dict[aid])
+            print(f"  {aid}: shape={next_obs.shape}, obs={next_obs}")
+
+        print("[example] rew_dict:", rew_dict)
+        print("[example] done_dict:", done_dict)
+        print("[example] info_dict keys:", list(info_dict.keys()))
+    finally:
+        env.close()
+
+'''
+[example] observation_space(per-agent): Box(4,)
+[example] action_space(per-agent): Box(2,)
+[example] agent_ids: ('zone_1', 'zone_2', 'zone_3', 'zone_4', 'zone_5')
+[example] reset obs sample:
+  zone_1: shape=(4,), obs=[22.726   22.33748  0.      15.84   ]
+  zone_2: shape=(4,), obs=[22.726    22.334093  0.        6.84    ]
+  zone_3: shape=(4,), obs=[22.726    22.279612  0.       15.84    ]
+  zone_4: shape=(4,), obs=[22.726    22.462717  0.        6.84    ]
+  zone_5: shape=(4,), obs=[22.726    22.197456  0.       29.64    ]
+[example] sampled action_dict:
+  zone_1: shape=(2,), action=[31.088589 28.034702]
+  zone_2: shape=(2,), action=[21.481365 25.179379]
+  zone_3: shape=(2,), action=[20.99938 35.44583]
+  zone_4: shape=(2,), action=[13.326278 19.870232]
+  zone_5: shape=(2,), action=[30.918587 37.283436]
+PipeIo.writeline: Opened ACT pipe /tmp/extctrl_2209203_act
+ExtCtrlRead: Opened ACT file: /tmp/extctrl_2209203_act
+[example] step next_obs sample:
+  zone_1: shape=(4,), obs=[   6.825      21.001638    0.       1141.1235  ]
+  zone_2: shape=(4,), obs=[  6.825     21.000225   0.       480.9806  ]
+  zone_3: shape=(4,), obs=[   6.825      21.000692    0.       1129.524   ]
+  zone_4: shape=(4,), obs=[  6.825     20.997995   0.       480.18198 ]
+  zone_5: shape=(4,), obs=[  6.825     20.999556   0.       620.835   ]
+[example] rew_dict: {'zone_1': -0.16713018356511308, 'zone_2': -0.16082563782812698, 'zone_3': -0.16721296352365972, 'zone_4': -0.16128507800161979, 'zone_5': -0.16236465032266037}
+[example] done_dict: {'zone_1': False, 'zone_2': False, 'zone_3': False, 'zone_4': False, 'zone_5': False, '__all__': False}
+[example] info_dict keys: ['zone_1', 'zone_2', 'zone_3', 'zone_4', 'zone_5']
+EnergyPlusEnv: Severe error(s) occurred. Error count: -1
+EnergyPlusEnv: Check contents of /home/wlc/rl-testbed-for-energyplus/eplog/ma-multi-demo/output/episode-00000000-2209203/eplusout.err
+'''
