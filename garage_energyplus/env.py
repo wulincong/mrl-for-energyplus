@@ -13,13 +13,14 @@ import csv
 import os
 import re
 import time
-from typing import Dict, List, Optional
+from datetime import datetime
+from typing import Dict, List, Optional, Any, Tuple
 
 import numpy as np
 from gym import Env, spaces
 
 from gym_energyplus.envs.energyplus_multiagent_env import EnergyPlusMultiAgentEnv
-
+from gym_energyplus.envs.energyplus_ma_single_env import EnergyPlusMASingleEnv
 
 ZONE_IDS = tuple(f"zone_{i}" for i in range(1, 6))
 MONTHS = tuple(range(1, 13))
@@ -39,7 +40,6 @@ class EplusMonthEnv(Env):
     Obs:  [T_outdoor, T_zone, CoolRate_zone, HeatRate_zone]  (dim=4)
     Act:  [htg_setpoint, clg_setpoint] normalized to [-1, 1]  (dim=2)
     """
-
     # Class-level config (set via configure() before instantiation)
     energyplus_file: str = "/usr/local/energyplus-9.5.0"
     model_file: str = "EnergyPlus/5Zone/5ZoneAirCooled.idf"
@@ -47,7 +47,7 @@ class EplusMonthEnv(Env):
         "EnergyPlus/Model-9-5-0/WeatherData/"
         "USA_CA_San.Francisco.Intl.AP.724940_TMY3.epw"
     )
-    log_dir: str = "eplog/garage-rl2"
+    log_dir: str = "eplog/garage-month-env"
     seed: int = 0
     full_year: bool = False  # when True, run full-year simulation (no month patching)
 
@@ -70,6 +70,7 @@ class EplusMonthEnv(Env):
         cls.log_dir = os.path.abspath(log_dir)
         cls.seed = int(seed)
         cls.full_year = bool(full_year)
+
 
     def __init__(self):
         self._rng = np.random.RandomState(self.seed)
@@ -326,3 +327,108 @@ class EplusMonthEnv(Env):
         with open(out_path, "w") as f:
             f.writelines(out)
         return out_path
+
+
+class EplusYearEnv(EnergyPlusMASingleEnv):
+    """
+    Garage-ready single-agent EnergyPlus environment (5-zone, full year).
+
+    Usage
+    -----
+    # 1. 实例化之前，用 classmethod 配置
+    EplusYearEnv.configure(
+        energyplus_file="/usr/local/energyplus-9.5.0",
+        model_file="EnergyPlus/5Zone/5ZoneAirCooled.idf",
+        weather_file="EnergyPlus/WeatherData/USA_CA_SF_TMY3.epw",
+        log_dir="eplog/run-01",
+        seed=42,
+        verbose=False,
+        max_episode_steps=8760,
+    )
+
+    # 2. 实例化 & 接入 Garage
+    env = GymEnv(EplusYearEnv())
+    """
+    # Class-level config (set via configure() before instantiation)
+    energyplus_file: str = "/usr/local/energyplus-9.5.0"
+    model_file: str = "EnergyPlus/5Zone/5ZoneAirCooled.idf"
+    weather_file: str = (
+        "EnergyPlus/Model-9-5-0/WeatherData/"
+        "USA_CA_San.Francisco.Intl.AP.724940_TMY3.epw"
+    )
+    log_dir: str = "eplog/garage-year-env"
+    seed: int = 0
+    full_year: bool = False  # when True, run full-year simulation (no month patching)
+    max_episode_steps = 35040
+
+    @classmethod
+    def configure(
+        cls,
+        *,
+        energyplus_file: str,
+        model_file: str,
+        weather_file: str,
+        log_dir: str,
+        seed: int = 0,
+        full_year: bool = False,
+        verbose=False,
+        max_episode_steps = 35040
+    ) -> None:
+        cls.energyplus_file = os.path.abspath(energyplus_file)
+        cls.model_file = os.path.abspath(model_file)
+        cls.weather_file = os.path.abspath(weather_file)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        cls.log_dir = os.path.abspath(f"{log_dir}-{timestamp}")
+        cls.seed = int(seed)
+        cls.full_year = bool(full_year)
+        cls.max_episode_steps = max_episode_steps
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            energyplus_file=self.energyplus_file,
+            model_file=self.model_file,
+            weather_file=self.weather_file,
+            log_dir=self.log_dir,
+            verbose=False,
+            seed=self.seed,
+            framework="ray",
+        )
+        self._step_count = 0
+
+    def reset(self) -> np.ndarray:
+        self._step_count = 0
+        return super().reset()
+
+    def step(self, action) -> Tuple[np.ndarray, float, bool, dict]:
+        obs, reward, done, info = super().step(action)
+        self._step_count += 1
+        if self._step_count >= self.max_episode_steps:
+            done = True
+            info["TimeLimit.truncated"] = True
+        return obs, reward, done, info
+
+TASK_POOL_V1:List[Dict[str, Any]] = [
+    {"seed":0, "tag":f"task_{i}"} for i in range(8)
+]
+
+class EplusMetaEnv(EplusYearEnv):
+
+    def __init__(self, task: Dict[str, Any] = None, **kwargs):
+        super().__init__(**kwargs)
+        self._current_task = task or TASK_POOL_V1[0]
+
+    def sample_tasks(self, num_tasks:int) -> List[Dict[str, Any]]:
+        return [TASK_POOL_V1[0]] * num_tasks
+
+    def set_task(self, task: Dict[str, Any])-> None:
+        self._current_task = task
+        self.seed = 0
+
+    def get_task(self) -> Dict[str, Any]:
+        return self._current_task
+
+    def reset(self) -> np.ndarray:
+        np.random.seed(0)
+        return super().reset()
+
+

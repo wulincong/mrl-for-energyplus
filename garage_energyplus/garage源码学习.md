@@ -152,7 +152,7 @@ for _ in trainer.step_epochs():# 外层：epoch 循环
       EpisodeBatch(obs=[...2个...], lengths=[2], agent_infos={'batch_idx': [0,0]}),    # Episode B       
       EpisodeBatch(obs=[...4个...], lengths=[4], agent_infos={'batch_idx': [1,1,1,1]}),# Episode C       
       EpisodeBatch(obs=[...3个...], lengths=[3], agent_infos={'batch_idx': [1,1,1]}),  # Episode D       
-  ]      
+  ]
  
   # 按任务分组后 
   paths_by_task = {      
@@ -230,29 +230,29 @@ for _ in trainer.step_epochs():# 外层：epoch 循环
  
   start_episode() - 初始化 episode (第91-98行)   
  
-  def start_episode(self):       
-      self._eps_length = 0       
+  def start_episode(self):
+      self._eps_length = 0
       self._prev_obs, episode_info = self.env.reset()  # 重置环境
  
-      # 保存 episode 级别信息（如目标状态）      
-      for k, v in episode_info.items():          
+      # 保存 episode 级别信息（如目标状态）
+      for k, v in episode_info.items():
           self._episode_infos[k].append(v)       
  
-      self.agent.reset()  # 重置策略（如 RNN 隐状态）            
+      self.agent.reset()  # 重置策略（如 RNN 隐状态）
  
-  step_episode() - 执行单步交互 (第100-122行)    
+  step_episode() - 执行单步交互 (第100-122行)
  
-  def step_episode(self):        
-      """Take a single time-step in the current episode."""      
-      if self._eps_length < self._max_episode_length:            
-          # 1. 策略选择动作      
+  def step_episode(self):
+      """Take a single time-step in the current episode."""
+      if self._eps_length < self._max_episode_length:
+          # 1. 策略选择动作
           a, agent_info = self.agent.get_action(self._prev_obs)  
  
-          # 2. 环境执行动作      
-          es = self.env.step(a)  # EnvStep       
+          # 2. 环境执行动作
+          es = self.env.step(a)  # EnvStep
  
           # 3. 保存数据到缓冲区  
-          self._observations.append(self._prev_obs)              
+          self._observations.append(self._prev_obs)
           self._env_steps.append(es)  # 包含 action, reward, next_obs, env_info  
           for k, v in agent_info.items():        
               self._agent_infos[k].append(v)          

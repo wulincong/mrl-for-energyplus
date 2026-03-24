@@ -20,22 +20,32 @@ Usage:
         --log_dir eplog/garage-rl2-ppo-full-year
 """
 import os
+import numpy as np
+
+import tensorflow as tf
+
+# Numpy 1.24+ removes np.bool; garage still references it.
+if not hasattr(np, "bool"):
+    np.bool = np.bool_
 
 import click
 from garage import wrap_experiment
-from garage.envs import GymEnv
+from garage.envs import GymEnv, normalize
 from garage.experiment import task_sampler
 from garage.experiment.deterministic import set_seed
+from garage.experiment.task_sampler import SetTaskSampler
 from garage.np.baselines import LinearFeatureBaseline
 from garage.tf.algos import RL2PPO
 from garage.tf.algos.rl2 import RL2Env
 from garage.tf.policies import GaussianGRUPolicy
 from garage.trainer import TFTrainer
 
-from garage_energyplus.env import EplusMonthEnv
+from garage_energyplus.env import EplusMonthEnv, EplusMetaEnv
 from garage_energyplus.sampler import EplusSharedSampler
 from garage_energyplus.metrics import print_epoch_metrics, print_validation_summary
 from garage_energyplus.evaluation import evaluate_full_year, save_yearly_validation_csv
+from garage.sampler import LocalSampler, DefaultWorker
+from garage.tf.algos.rl2 import RL2Worker
 
 
 class EplusRL2PPO(RL2PPO):
@@ -235,6 +245,98 @@ def run_rl2ppo(
 
         trainer.train(n_epochs=n_epochs, batch_size=batch_size)
 
+# ── 超参 ──────────────────────────────────────────────────────────────────────
+META_BATCH_SIZE   = 2      # 等于 TASK_POOL_V1 的大小
+ROLLOUTS_PER_TASK = 1      # 每个任务采 1 条 episode
+MAX_EP_LEN        = 96    # 调试用短 episode（一天 = 96步×7天）
+N_EPOCHS          = 50
+
+@wrap_experiment(log_dir="data/local/garage/eplus-rl2ppo-7days", snapshot_mode="none")
+def train(ctxt=None):
+    tf.compat.v1.disable_eager_execution()
+
+    # 1. 配置环境类级参数
+    EplusMetaEnv.configure(
+        energyplus_file="/usr/local/energyplus-9.5.0",
+        model_file="EnergyPlus/5Zone/5ZoneAirCooled.idf",
+        weather_file="EnergyPlus/Model-9-5-0/WeatherData/USA_CA_San.Francisco.Intl.AP.724940_TMY3.epw",
+        log_dir="eplog/rl2-v1",
+        seed=0,
+        max_episode_steps=MAX_EP_LEN,
+    )
+
+    with TFTrainer(snapshot_config=ctxt) as trainer:
+        task_sampler = SetTaskSampler(EplusMetaEnv, 
+                                      wrapper=lambda env, _: RL2Env(
+                                          GymEnv(env, max_episode_length=MAX_EP_LEN)
+                                      ))
+
+        dummy_env = RL2Env(
+            GymEnv(EplusMetaEnv(),
+                   max_episode_length=MAX_EP_LEN))
+        env_spec = dummy_env.spec
+
+        policy = GaussianGRUPolicy(
+            env_spec=env_spec,
+            hidden_dim=64,
+            name="rl2_policy",
+            state_include_action=False
+        )
+
+        baseline = LinearFeatureBaseline(env_spec=env_spec)
+
+        # sampler = LocalSampler(
+        #     agents=policy,
+        #     envs=dummy_env,
+        #     n_workers=META_BATCH_SIZE,
+        #     max_episode_length=MAX_EP_LEN,
+        #     is_tf_worker=True,
+        #     worker_class=RL2Worker,
+        #     worker_args=dict(n_episodes_per_trial=ROLLOUTS_PER_TASK),
+        # )
+
+        sampler = LocalSampler(
+            agents=policy,
+            envs=dummy_env,
+            n_workers=META_BATCH_SIZE,
+            max_episode_length=MAX_EP_LEN,
+            is_tf_worker=True,
+            worker_class=RL2Worker,
+            worker_args=dict(n_episodes_per_trial=ROLLOUTS_PER_TASK),
+        )
+
+        algo = RL2PPO(
+            meta_batch_size=META_BATCH_SIZE,
+            task_sampler=task_sampler,
+            env_spec=env_spec,
+            policy=policy,
+            baseline=baseline,
+            episodes_per_trial=ROLLOUTS_PER_TASK,
+            sampler=sampler,
+            discount=0.99,
+            gae_lambda=0.95,
+            lr_clip_range=0.2,
+            optimizer_args=dict(
+                learning_rate=3e-4, 
+                max_optimization_epochs=5, 
+                batch_size=32),
+            stop_entropy_gradient=True,
+            entropy_method='max',
+            policy_ent_coeff=0.02,
+            center_adv=False
+        )
+
+        trainer.setup(algo=algo, env=dummy_env)
+        
+        trainer.train(n_epochs=N_EPOCHS,
+                      batch_size=META_BATCH_SIZE * ROLLOUTS_PER_TASK * MAX_EP_LEN)
+        # trainer.setup(algo=algo, env=dummy_env)
+        # trainer.train(
+        #     n_epochs=N_EPOCHS,
+        #     batch_size=META_BATCH_SIZE * ROLLOUTS_PER_TASK * MAX_EP_LEN,
+        # )
+        # dummy_env.close()
+
 
 if __name__ == "__main__":
-    run_rl2ppo()
+    train()

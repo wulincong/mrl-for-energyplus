@@ -59,14 +59,17 @@ class EnergyPlusMultiAgentEnv(MultiAgentEnv):
         return self._split_obs(obs)
 
     def step(self, action_dict: Dict[str, np.ndarray]):
-        joint_action = self._merge_actions(action_dict)
+        joint_action, used_actions = self._merge_actions(action_dict)
         obs, reward, done, info = self._env.step(joint_action)
 
         obs_dict = self._split_obs(obs)
-        rew_dict = self._compute_rewards(obs_dict, action_dict)
+        rew_dict, comp_dict = self._compute_rewards(obs_dict, used_actions)
         done_dict = {aid: done for aid in self.AGENT_IDS}
         done_dict["__all__"] = done
         info_dict = {aid: dict(info) for aid in self.AGENT_IDS}
+        for aid in self.AGENT_IDS:
+            info_dict[aid]["reward_components"] = comp_dict[aid]
+            self._prev_actions[aid] = used_actions[aid]
         return obs_dict, rew_dict, done_dict, info_dict
 
     def close(self):
@@ -99,22 +102,25 @@ class EnergyPlusMultiAgentEnv(MultiAgentEnv):
             return np.zeros(1 + 3 * self.ZONES, dtype=np.float32)
         return obs
 
-    def _merge_actions(self, action_dict: Dict[str, np.ndarray]) -> np.ndarray:
+    def _merge_actions(
+        self, action_dict: Dict[str, np.ndarray]
+    ) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
         actions = []
+        used_actions: Dict[str, np.ndarray] = {}
         for i, aid in enumerate(self.AGENT_IDS):
             act = action_dict.get(aid)
             if act is None:
                 act = self._prev_actions[aid]
             act = np.asarray(act, dtype=np.float32)
-            self._prev_actions[aid] = act
+            used_actions[aid] = act
             actions.extend([float(act[0]), float(act[1])])
-        return np.asarray(actions, dtype=np.float32)
+        return np.asarray(actions, dtype=np.float32), used_actions
 
     def _compute_rewards(
         self,
         obs_dict: Dict[str, np.ndarray],
         action_dict: Dict[str, np.ndarray]
-    ) -> Dict[str, float]:
+    ) -> Tuple[Dict[str, float], Dict[str, Dict[str, float]]]:
         # 2Zone-like reward per zone: gaussian + trapezoid + hvac power penalty + action smoothness
         temp_center = 23.5
         temp_tol = 0.5
@@ -125,6 +131,7 @@ class EnergyPlusMultiAgentEnv(MultiAgentEnv):
         smooth_weight = 0.001
 
         rew_dict: Dict[str, float] = {}
+        comp_dict: Dict[str, Dict[str, float]] = {}
         for aid in self.AGENT_IDS:
             tout, tz, cool_rate, heat_rate = obs_dict[aid]
 
@@ -146,9 +153,17 @@ class EnergyPlusMultiAgentEnv(MultiAgentEnv):
             delta = act - prev
             smooth = -float(np.sum(delta * delta)) * smooth_weight
 
-            rew_dict[aid] = float(gauss + trap + power_pen + smooth)
+            total = float(gauss + trap + power_pen + smooth)
+            rew_dict[aid] = total
+            comp_dict[aid] = {
+                "gauss": float(gauss),
+                "trap": float(trap),
+                "power_pen": float(power_pen),
+                "smooth": float(smooth),
+                "total": total,
+            }
 
-        return rew_dict
+        return rew_dict, comp_dict
 
 
 if __name__ == "__main__":
